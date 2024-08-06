@@ -11,7 +11,7 @@ from safety_gymnasium.wrappers.gymnasium_conversion import make_gymnasium_enviro
 
 from wrapperEnv import CustomEnv
 from stable_baselines3 import SAC
-from src.callback import CustomCallback
+from callback import CustomCallback
 
 
 load_dotenv()
@@ -57,7 +57,7 @@ def main(dir_name, params):
         }
 
 
-        wandb.init(project='Stable Baselines', name = f'{model_name}-{env_id}-{run_name}', config = config)
+        run = wandb.init(project='Stable Baselines', name = f'{model_name}-{env_id}-{run_name}', config = config)
     
     if params['main'].get('update', False):
         if wandb_enabled:

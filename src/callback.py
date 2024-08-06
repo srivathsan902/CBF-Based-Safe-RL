@@ -11,7 +11,7 @@ class CustomCallback(BaseCallback):
         self.params = params
         self.dir_name = dir_name
         self.steps = 0
-        self.save_freq = params['train'].get('save_every', 1000)
+        self.save_freq = params['train'].get('save_every', 200)
         self.save_path = dir_name
         self.prev_end_episode = 0
         self.episode_rewards = 0
@@ -31,9 +31,9 @@ class CustomCallback(BaseCallback):
         self.all_corrective_actions = []
         self.all_safe_actions = []
 
-        if self.params['base'].get('wandb_enabled', False):
-            self.video_log_step = 0
-            self.metric_log_step = 0
+        # if self.params['base'].get('wandb_enabled', False):
+        #     self.video_log_step = 0
+        #     self.metric_log_step = 0
 
 
     def load_previous_run(self, data, prev_end_episode):
@@ -55,9 +55,9 @@ class CustomCallback(BaseCallback):
                     "Reward": self.all_rewards[i],
                     "Cost": self.all_costs[i],
                     "No. of Corrective Actions": self.all_corrective_actions[i],
-                    "% Safe Actions": self.all_safe_actions[i]
-                },step = self.metric_log_step)
-                self.metric_log_step += 1
+                    "% Safe Actions": self.all_safe_actions[i]})
+                # },step = self.metric_log_step)
+                # self.metric_log_step += 1
         
     def _on_step(self) -> bool:
         self.steps += 1
@@ -142,9 +142,9 @@ class CustomCallback(BaseCallback):
             fps = len(plot_video_data) / 10
 
             wandb.log({
-                f"Episode {self.episode_count-self.recorded_videos} ": wandb.Video(plot_video_data, fps=fps, format="mp4")
-            }, step = self.video_log_step)
-            self.video_log_step += 1
+                f"Episode {self.episode_count-self.recorded_videos} ": wandb.Video(plot_video_data, fps=fps, format="mp4")})
+            # }, step = self.video_log_step)
+            # self.video_log_step += 1
 
             self.recorded_videos += 1
             if self.recorded_videos >= 4:
@@ -221,9 +221,9 @@ class CustomCallback(BaseCallback):
                     "Reward": self.episode_rewards,
                     "Cost": self.episode_costs,
                     "No. of Corrective Actions": self.episode_corrective_actions,
-                    "% Safe Actions": 100 - 100 * self.episode_costs / self.episode_length
-                }, step = self.metric_log_step)
-                self.metric_log_step += 1
+                    "% Safe Actions": 100 - 100 * self.episode_costs / self.episode_length})
+                # }, step = self.metric_log_step)
+                # self.metric_log_step += 1
 
             self._reset_episode_metrics()
             if self.steps == self.params['train']['total_num_steps']:

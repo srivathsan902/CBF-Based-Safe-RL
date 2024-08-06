@@ -1,0 +1,16 @@
+__pycache__/
+artifacts/
+backup/
+safety-gymnasium/
+whole_program.py
+_.ipynb
+utils.py
+function_timer.py
+parallelize_actions.ipynb
+time_action.py
+wandb/
+.env
+src/kk.py
+save_wandb.py
+src/sympy.ipynb
+src/testing.py

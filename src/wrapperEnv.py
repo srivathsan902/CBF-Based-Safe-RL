@@ -5,9 +5,8 @@ import gymnasium
 import numpy as np
 from CBF import CBF
 from stable_baselines3 import SAC
-from src.callback import CustomCallback
+from callback import CustomCallback
 from safety_gymnasium.wrappers.gymnasium_conversion import make_gymnasium_environment
-
 
 class CustomEnv(gymnasium.Wrapper):
     def __init__(self, env, params):
