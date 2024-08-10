@@ -30,6 +30,7 @@ def CBF(state, pos, action, low, high, debug = False):
     '''
     # ********* Define the parameters of the system *********
     d = 1.125
+    d_buffer = 0.1
     d = 1.1
     d_thresh = 0.5
     r = 0.1
@@ -54,7 +55,7 @@ def CBF(state, pos, action, low, high, debug = False):
 
     # ********* Define the Control Barrier Functions h *********
     x_star = x + r*sp.cos(theta)
-    h1 = (d**2 - x_star**2)
+    h1 = ((d-d_buffer)**2 - x_star**2)
     
     if debug:
         print('x : ', pos[0], ' v_x', v_val*np.cos(theta_val))

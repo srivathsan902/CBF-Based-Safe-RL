@@ -30,9 +30,9 @@ def CBF(state, pos, action, low, high, debug = False):
     '''
     # ********* Define the parameters of the system *********
     d_thresh = 0.1
-    d_thresh_vel = 0.1
+    d_thresh_vel = 0.5
     r = 0.1
-    max_lidar_distance = 6
+    max_lidar_distance = 3
     mass = 0.46786522454870777
 
     x, y, v, theta = sp.symbols('x y v theta')
@@ -53,42 +53,74 @@ def CBF(state, pos, action, low, high, debug = False):
     v_val = state[3]
 
     # ********* Extract lidar values from the state *********
-    lidar_values = state[-16:]  # Assuming the last 16 values in the state are lidar values
-    lidar_angles = np.linspace(0, 2*np.pi, len(lidar_values))  # Assuming 180 degree lidar scan
+    lidar_values_hazard = state[-32:-16]  # First 16 values for hazards
+    lidar_values_vase = state[-16:]  # Next 16 values for cubic vases
+    lidar_angles = np.linspace(0, 2*np.pi, 16)  # Assuming 180 degree lidar scan
 
     # ********* Define the Control Barrier Functions h *********
     cbf_constraints = []
     k1 = 100  # CBF gain
     k2 = 100
     u = cp.Variable(2)
+    vase_radius = np.sqrt(3)*0.1/2
+    hazard_radius = 0.2
 
     x_star = x + r*sp.cos(theta)
     y_star = y + r*sp.sin(theta)
 
-    for lidar_value, lidar_angle in zip(lidar_values, lidar_angles):
-        if lidar_value <= 0.90:
+    for lidar_value, lidar_angle in zip(lidar_values_hazard, lidar_angles):
+        if lidar_value <= 0.85:
             continue
         
-        lidar_distance = (1-lidar_value)*max_lidar_distance
-        x_obs = pos[0] + lidar_distance*sp.cos(theta_val + lidar_angle)
-        y_obs = pos[1] + lidar_distance*sp.sin(theta_val + lidar_angle)
+        lidar_distance = (1 - lidar_value) * max_lidar_distance
+        x_obs = pos[0] + lidar_distance * np.cos(theta_val + lidar_angle)
+        y_obs = pos[1] + lidar_distance * np.sin(theta_val + lidar_angle)
 
-        h_position = (x_star - x_obs)**2 + (y_star - y_obs)**2 - d_thresh**2
+        h_position = (x_star - x_obs) ** 2 + (y_star - y_obs) ** 2 - (2*hazard_radius) ** 2
 
         rel_x_obs = x_obs - x
         rel_y_obs = y_obs - y
-        if v_val*sp.cos(theta_val)*(x_obs - pos[0]) + v_val*sp.sin(theta_val)*(x_obs - pos[1]) < 0:
-            h_velocity = 0.01 - (v*sp.cos(theta)*(rel_x_obs + d_thresh_vel*sp.cos(theta_val)) + v*sp.sin(theta)*(rel_y_obs + d_thresh_vel*sp.sin(theta_val)))
-        elif v_val*sp.cos(theta_val)*(x_obs - pos[0]) + v_val*sp.sin(theta_val)*(x_obs - pos[1]) > 0:
-            h_velocity = 0.01 - (v*sp.cos(theta)*(rel_x_obs - d_thresh_vel*sp.cos(theta_val)) + v*sp.sin(theta)*(rel_y_obs - d_thresh_vel*sp.sin(theta_val)))
+        if v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) < 0:
+            h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs + d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs + d_thresh_vel * sp.sin(theta_val)))
+        elif v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) > 0:
+            h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs - d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs - d_thresh_vel * sp.sin(theta_val)))
         else:
             h_velocity = 0.01
 
         grad_h_position = sp.Matrix([sp.diff(h_position, var) for var in (x, y, v, theta)])
         grad_h_velocity = sp.Matrix([sp.diff(h_velocity, var) for var in (x, y, v, theta)])
 
-        position_constraint = grad_h_position.dot(X_dot) + k1*h_position
-        velocity_constraint = grad_h_velocity.dot(X_dot) + k2*h_velocity
+        position_constraint = grad_h_position.dot(X_dot) + k1 * h_position
+        velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
+
+        cbf_constraints.append(position_constraint)
+        cbf_constraints.append(velocity_constraint)
+
+    # Cubic vase obstacles
+    for lidar_value, lidar_angle in zip(lidar_values_vase, lidar_angles):
+        if lidar_value <= 0.85:
+            continue
+        
+        lidar_distance = (1 - lidar_value) * max_lidar_distance
+        x_obs = pos[0] + lidar_distance * np.cos(theta_val + lidar_angle)
+        y_obs = pos[1] + lidar_distance * np.sin(theta_val + lidar_angle)
+
+        h_position = (x_star - x_obs) ** 2 + (y_star - y_obs) ** 2 - (2*vase_radius) ** 2
+
+        rel_x_obs = x_obs - x
+        rel_y_obs = y_obs - y
+        if v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) < 0:
+            h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs + d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs + d_thresh_vel * sp.sin(theta_val)))
+        elif v_val * sp.cos(theta_val) * (x_obs - pos[0]) + v_val * sp.sin(theta_val) * (y_obs - pos[1]) > 0:
+            h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs - d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs - d_thresh_vel * sp.sin(theta_val)))
+        else:
+            h_velocity = 0.01
+
+        grad_h_position = sp.Matrix([sp.diff(h_position, var) for var in (x, y, v, theta)])
+        grad_h_velocity = sp.Matrix([sp.diff(h_velocity, var) for var in (x, y, v, theta)])
+
+        position_constraint = grad_h_position.dot(X_dot) + k1 * h_position
+        velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
 
         cbf_constraints.append(position_constraint)
         cbf_constraints.append(velocity_constraint)
@@ -136,22 +168,22 @@ def CBF(state, pos, action, low, high, debug = False):
         safe_action = u.value
         safe_action = np.clip(safe_action, low, high)
 
-        tolerance = 1e-4
-        candidate_actions = [safe_action]
-        num_random_samples = 20  # Number of random samples to check for equivalent solutions
-        for _ in range(num_random_samples):
-            random_action = np.random.uniform(low, high, 2)
-            if prob.constraints[0].dual_value is not None:
-                random_constraints = [
-                    cbf_func(pos[0], pos[1], v_val, theta_val, random_action[0], random_action[1]) >= 0 for cbf_func in constraint_funcs
-                ]
-                if np.all(random_constraints):
-                    random_objective = np.sum((random_action - action) ** 2)
-                    if np.abs(random_objective - prob.value) < tolerance:
-                        candidate_actions.append(random_action)
+        # tolerance = 1e-4
+        # candidate_actions = [safe_action]
+        # num_random_samples = 20  # Number of random samples to check for equivalent solutions
+        # for _ in range(num_random_samples):
+        #     random_action = np.random.uniform(low, high, 2)
+        #     if prob.constraints[0].dual_value is not None:
+        #         random_constraints = [
+        #             cbf_func(pos[0], pos[1], v_val, theta_val, random_action[0], random_action[1]) >= 0 for cbf_func in constraint_funcs
+        #         ]
+        #         if np.all(random_constraints):
+        #             random_objective = np.sum((random_action - action) ** 2)
+        #             if np.abs(random_objective - prob.value) < tolerance:
+        #                 candidate_actions.append(random_action)
 
-        if len(candidate_actions) > 1:
-            safe_action = candidate_actions[np.random.randint(len(candidate_actions))]
+        # if len(candidate_actions) > 1:
+        #     safe_action = candidate_actions[np.random.randint(len(candidate_actions))]
 
         if debug:
             print('***************After solving the optimization problem*****************')
@@ -159,6 +191,7 @@ def CBF(state, pos, action, low, high, debug = False):
             for i, cbf_func in enumerate(constraint_funcs):
                 print(f'Constraint {i+1}', cbf_func(pos[0], pos[1], v_val, theta_val, safe_action[0], safe_action[1]))
             print('\n')
+            # time.sleep(2)
         return safe_action, optimizer_used
     else:
         if debug:

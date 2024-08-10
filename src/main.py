@@ -13,12 +13,20 @@ from wrapperEnv import CustomEnv
 from stable_baselines3 import SAC
 from callback import CustomCallback
 
+import CBF
+import CBF_Lidar_Based
 
 load_dotenv()
 
 artifacts_folder = 'artifacts'
 # os.environ['WANDB_MODE'] = 'offline'
 
+def extract_task(env_id):
+    if 'Circle' in env_id:
+        return 'Circle'
+    if 'Goal' in env_id:
+        return 'Goal'
+    
 def main(dir_name, params):
 
     if not os.path.exists(dir_name):
@@ -28,12 +36,20 @@ def main(dir_name, params):
     render_mode = params['main'].get('render_mode', None)
     model_name = params['main']['model_name']
 
-    if render_mode == 'None':
-        env = make_gymnasium_environment('SafetyPointCircle1Gymnasium-v0')
-    else:
-        env = make_gymnasium_environment('SafetyPointCircle1Gymnasium-v0', render_mode=render_mode)
+    gym_env_name = env_id.split('-')[0] + 'Gymnasium-v0'
 
-    env = CustomEnv(env, params)
+    if render_mode == 'None':
+        env = make_gymnasium_environment(gym_env_name)
+    else:
+        env = make_gymnasium_environment(gym_env_name, render_mode=render_mode)
+    
+    # Depending on type of env: Circle or Goal, choose CBF to pass
+    task = extract_task(env_id)
+    params['task'] = task
+    if task == 'Goal':
+        env = CustomEnv(env, params, CBF_Lidar_Based.CBF)
+    elif task == 'Circle':
+        env = CustomEnv(env, params, CBF.CBF)
 
     wandb_enabled = params['base']['wandb_enabled']
 
@@ -134,6 +150,11 @@ def main(dir_name, params):
 if __name__ == '__main__':
 
     with open('src/params.yaml', 'r') as f:
+        params = yaml.safe_load(f)
+    
+    params_file_name = params['agent'] + params['task'] + params['level'] + '.yaml'
+
+    with open(os.path.join('src', params_file_name), 'r') as f:
         params = yaml.safe_load(f)
 
     '''

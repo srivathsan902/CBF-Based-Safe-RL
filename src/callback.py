@@ -22,14 +22,21 @@ class CustomCallback(BaseCallback):
         self.plot = True
         self.positions = []
         self.velocities = []
+        self.thetas = []
         self.actions = []
         self.record_every = params['train'].get('record_every', 100)
         self.recorded_videos = 0
         
+        self.task = params['task']
+
         self.all_rewards = []
         self.all_costs = []
         self.all_corrective_actions = []
         self.all_safe_actions = []
+
+        if self.task == 'Goal':
+            self.hazard_lidars = []
+            self.vase_lidars = []
 
         # if self.params['base'].get('wandb_enabled', False):
         #     self.video_log_step = 0
@@ -132,9 +139,16 @@ class CustomCallback(BaseCallback):
         self.positions.append(info.get('position', [0, 0]))
         self.velocities.append(info.get('velocity', [0, 0]))
         self.actions.append(info.get('action', [0, 0]))
+        self.thetas.append(info.get('theta', 0))
+
+        if self.task == 'Goal':
+            self.hazard_lidars.append(info.get('hazard_lidar', [0]*16))
+            self.vase_lidars.append(info.get('vase_lidar', [0]*16))
 
     def _log_video(self):
         """Log the trajectory video to Wandb."""
+        plot_video_data = self._create_plot_video()
+
         if self.params['base'].get('wandb_enabled', False):
             plot_video_data = self._create_plot_video()
             if plot_video_data is None:
@@ -170,21 +184,82 @@ class CustomCallback(BaseCallback):
         return np.transpose(plot_video_data, (0, 3, 1, 2))
 
     def _draw_plot(self, ax, pos, i):
-        """Draw the plot for a single frame."""
-        circle = plt.Circle((0, 0), 1.5, color='green', fill=False)
-        ax.add_patch(circle)
-        plt.axvline(x=1.125, color='r')
-        plt.axvline(x=-1.125, color='r')
-        plt.plot([p[0] for p in self.positions[:i+1]], [p[1] for p in self.positions[:i+1]], 'bo-', linewidth=0.5, markersize=2)
-        plt.xlim(-2, 2)
-        plt.ylim(-4, 4)
-        plt.title(f'Step {i+1}')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        ax.set_aspect('equal', 'box')
+        if self.task == 'Circle':
+            """Draw the plot for a single frame."""
+            circle = plt.Circle((0, 0), 1.5, color='green', fill=False)
+            ax.add_patch(circle)
+            plt.axvline(x=1.125, color='r')
+            plt.axvline(x=-1.125, color='r')
+            plt.plot([p[0] for p in self.positions[:i+1]], [p[1] for p in self.positions[:i+1]], 'bo-', linewidth=0.5, markersize=2)
+            plt.xlim(-2, 2)
+            plt.ylim(-4, 4)
+            plt.title(f'Step {i+1}')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            ax.set_aspect('equal', 'box')
 
-        text_str = self._create_annotation_text(pos, i)
-        plt.text(2.2, 2.5, text_str, fontsize=12, bbox=dict(facecolor='white', alpha=0.7))
+            text_str = self._create_annotation_text(pos, i)
+            if self.task == 'Circle':
+                plt.text(2.2, 2.5, text_str, fontsize=12, bbox=dict(facecolor='white', alpha=0.7))
+            if self.task == 'Goal':
+                plt.text(5.2, 5.2, text_str, fontsize=12, bbox=dict(facecolor='white', alpha=0.7))
+
+        if self.task == 'Goal':
+            info = self.locals.get('infos', [{}])[-1]
+            hazard_locations = info.get('hazard_positions', [[]])
+            vase_locations = info.get('vase_positions', [[]])
+
+            for x_hazard ,y_hazard, _ in hazard_locations:
+                circle = plt.Circle((x_hazard,y_hazard), 0.2, color='blue', alpha=0.5, fill = True)
+                ax.add_patch(circle)
+            
+            for x_vase, y_vase, _ in vase_locations:
+                circle = plt.Circle((x_vase, y_vase), 0.09, color = 'cyan', alpha=0.5, fill = True)
+                ax.add_patch(circle)
+
+            x_goal, y_goal, _ = info.get('goal_position', [0,0,0])
+            circle = plt.Circle((x_goal,y_goal), 0.3, color = 'lightgreen', alpha=0.5, fill = True)
+            ax.add_patch(circle)
+            
+            x_agent, y_agent, _ = pos
+            theta = self.thetas[i]
+            lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
+
+            hazard_lidar = self.hazard_lidars[i]
+            for hazard_lidar_value, lidar_angle in zip(hazard_lidar, lidar_angle):
+                if hazard_lidar_value == 0:         # Obstacle is not in the lidar range
+                    continue
+                lidar_distance = (1-hazard_lidar_value)*3
+                x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
+                y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
+                circle = plt.Circle((x_lid,y_lid), 2*0.2, color='blue', alpha=0.5, fill = False)
+                ax.add_patch(circle)
+                plt.plot([x_agent, x_lid], [y_agent, y_lid], color='blue', linewidth=0.5, alpha=0.5)
+            
+            vase_lidar = self.vase_lidars[i]
+            lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
+            for vase_lidar_value, lidar_angle in zip(vase_lidar, lidar_angle):
+                if vase_lidar_value == 0:           # Obstacle is not in the lidar range
+                    continue
+                lidar_distance = (1-vase_lidar_value)*3
+                x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
+                y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
+                circle = plt.Circle((x_lid,y_lid), 2*0.09, color='cyan', alpha=0.5, fill = False)
+                ax.add_patch(circle)
+                plt.plot([x_agent, x_lid], [y_agent, y_lid], color='cyan', linewidth=0.5, alpha=0.5)
+            
+
+            plt.plot([p[0] for p in self.positions[:i+1]], [p[1] for p in self.positions[:i+1]], 'ko-', linewidth=0.5, markersize=0.5)
+
+            plt.xlim(-5,5)
+            plt.ylim(-5,5)
+            plt.title(f'Step {i+1}')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            ax.set_aspect('equal', 'box')
+
+            text_str = self._create_annotation_text(pos, i)
+            plt.text(2.2, 2.5, text_str, fontsize=12, bbox=dict(facecolor='white', alpha=0.7))
 
     def _create_annotation_text(self, pos, i):
         """Create the annotation text for a single frame."""
@@ -206,6 +281,11 @@ class CustomCallback(BaseCallback):
         self.positions = []
         self.velocities = []
         self.actions = []
+        self.thetas = []
+        
+        if self.task == 'Goal':
+            self.hazard_lidars = []
+            self.vase_lidars = []
 
     def _on_rollout_end(self) -> None:
         """Log episodic metrics to Wandb at the end of a rollout."""

@@ -3,13 +3,13 @@ import yaml
 import wandb
 import gymnasium
 import numpy as np
-from CBF import CBF
+# from CBF import CBF
 from stable_baselines3 import SAC
 from callback import CustomCallback
 from safety_gymnasium.wrappers.gymnasium_conversion import make_gymnasium_environment
 
 class CustomEnv(gymnasium.Wrapper):
-    def __init__(self, env, params):
+    def __init__(self, env, params, CBF = None):
         super().__init__(env)
         self.env = env
         self.params = params
@@ -20,6 +20,11 @@ class CustomEnv(gymnasium.Wrapper):
         self.pos = self.env.task.agent.pos
         self.vel = self.get_velocities()
         self.num_steps = 0
+        
+        self.task_name = self.params['task']
+
+        # Control Barrier Function curated for the environment
+        self.CBF = CBF
     
     def reset(self, **kwargs):
         if 'seed' in kwargs:
@@ -29,12 +34,26 @@ class CustomEnv(gymnasium.Wrapper):
         self.vel = self.get_velocities()
         info['position'] = self.pos
         info['velocity'] = self.vel
+        info['theta'] = self.get_theta()
+
+        if self.task_name == 'Goal':
+            info['goal_position'] = self.env.task.goal.pos
+            info['hazard_positions'] = self.env.task.hazards.pos
+            info['vase_positions'] = self.env.task.vases.pos
+            info['hazard_lidar'] = self.state[-32:-16]
+            info['vase_lidar'] = self.state[-16:]
+
         return self.state, info
 
     def step(self, action):
-
-        safe_action, cbf_optimizer_used = CBF(np.array(self.state), self.pos, action, self.action_low, self.action_high)
-        next_state, reward, done, truncated, info = self.env.step(safe_action)
+        if self.CBF:
+            safe_action, cbf_optimizer_used = self.CBF(np.array(self.state), self.pos, action, self.action_low, self.action_high, debug = False)
+            # print('Safe action', safe_action)
+            next_state, reward, done, truncated, info = self.env.step(safe_action)
+        else:
+            safe_action = action
+            cbf_optimizer_used = False
+            next_state, reward, done, truncated, info = self.env.step(safe_action)
         self.num_steps += 1
 
         if self.num_steps >= self.max_steps:
@@ -47,7 +66,16 @@ class CustomEnv(gymnasium.Wrapper):
         info['action'] = safe_action
         info['velocity'] = self.vel
         info['position'] = self.pos
+        info['theta'] = self.get_theta()
 
+        if self.task_name == 'Goal':
+            info['goal_position'] = self.env.task.goal.pos
+            info['hazard_positions'] = self.env.task.hazards.pos
+            info['vase_positions'] = self.env.task.vases.pos
+            info['hazard_lidar'] = self.state[-32:-16]
+            info['vase_lidar'] = self.state[-16:]
+
+            
         self.state = next_state
         self.pos = self.env.task.agent.pos
         self.vel = self.get_velocities()

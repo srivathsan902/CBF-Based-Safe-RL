@@ -1,0 +1,25 @@
+base:
+  wandb_enabled: True
+main:
+  update: True
+  update_from: "artifacts/2024/08/02/Run_1/SAC_200"
+  env_id: 'SafetyPointCircle2-v0'
+  render_mode: 'human'
+  model_name: 'SAC'
+    
+train:
+  total_num_steps: 50000
+  max_steps_per_episode: 250
+  save_every: 200
+  record_every: 100
+
+testing:
+  models_dir: 'artifacts/2024/08/02/Run_1'
+  model_nums: [200]
+  num_runs: 5
+  max_steps_per_episode: 500
+  render_mode: 'human'
+  model_name: 'SAC'
+  
+
+
