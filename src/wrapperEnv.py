@@ -22,6 +22,7 @@ class CustomEnv(gymnasium.Wrapper):
         self.num_steps = 0
         
         self.task_name = self.params['task']
+        self.level_number = self.params['level']
 
         # Control Barrier Function curated for the environment
         self.CBF = CBF
@@ -30,6 +31,7 @@ class CustomEnv(gymnasium.Wrapper):
         if 'seed' in kwargs:
             kwargs.pop('seed')
         self.state, info = self.env.reset()
+        self.num_steps = 0
         self.pos = self.env.task.agent.pos
         self.vel = self.get_velocities()
         info['position'] = self.pos
@@ -38,10 +40,11 @@ class CustomEnv(gymnasium.Wrapper):
 
         if self.task_name == 'Goal':
             info['goal_position'] = self.env.task.goal.pos
-            info['hazard_positions'] = self.env.task.hazards.pos
-            info['vase_positions'] = self.env.task.vases.pos
-            info['hazard_lidar'] = self.state[-32:-16]
-            info['vase_lidar'] = self.state[-16:]
+            if self.level_number != '0':
+                info['hazard_positions'] = self.env.task.hazards.pos
+                info['vase_positions'] = self.env.task.vases.pos
+                info['hazard_lidar'] = self.state[-32:-16]
+                info['vase_lidar'] = self.state[-16:]
 
         return self.state, info
 
@@ -70,10 +73,11 @@ class CustomEnv(gymnasium.Wrapper):
 
         if self.task_name == 'Goal':
             info['goal_position'] = self.env.task.goal.pos
-            info['hazard_positions'] = self.env.task.hazards.pos
-            info['vase_positions'] = self.env.task.vases.pos
-            info['hazard_lidar'] = self.state[-32:-16]
-            info['vase_lidar'] = self.state[-16:]
+            if self.level_number != '0':
+                info['hazard_positions'] = self.env.task.hazards.pos
+                info['vase_positions'] = self.env.task.vases.pos
+                info['hazard_lidar'] = self.state[-32:-16]
+                info['vase_lidar'] = self.state[-16:]
 
             
         self.state = next_state

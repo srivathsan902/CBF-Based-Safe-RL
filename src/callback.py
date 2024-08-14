@@ -28,6 +28,7 @@ class CustomCallback(BaseCallback):
         self.recorded_videos = 0
         
         self.task = params['task']
+        self.level = params['level']
 
         self.all_rewards = []
         self.all_costs = []
@@ -35,8 +36,10 @@ class CustomCallback(BaseCallback):
         self.all_safe_actions = []
 
         if self.task == 'Goal':
-            self.hazard_lidars = []
-            self.vase_lidars = []
+            self.goal_position = []
+            if self.level != '0':
+                self.hazard_lidars = []
+                self.vase_lidars = []
 
         # if self.params['base'].get('wandb_enabled', False):
         #     self.video_log_step = 0
@@ -142,8 +145,10 @@ class CustomCallback(BaseCallback):
         self.thetas.append(info.get('theta', 0))
 
         if self.task == 'Goal':
-            self.hazard_lidars.append(info.get('hazard_lidar', [0]*16))
-            self.vase_lidars.append(info.get('vase_lidar', [0]*16))
+            if self.level != '0':
+                self.hazard_lidars.append(info.get('hazard_lidar', [0]*16))
+                self.vase_lidars.append(info.get('vase_lidar', [0]*16))
+            self.goal_position.append(info.get('goal_position', [0, 0]))
 
     def _log_video(self):
         """Log the trajectory video to Wandb."""
@@ -205,49 +210,51 @@ class CustomCallback(BaseCallback):
                 plt.text(5.2, 5.2, text_str, fontsize=12, bbox=dict(facecolor='white', alpha=0.7))
 
         if self.task == 'Goal':
-            info = self.locals.get('infos', [{}])[-1]
-            hazard_locations = info.get('hazard_positions', [[]])
-            vase_locations = info.get('vase_positions', [[]])
-
-            for x_hazard ,y_hazard, _ in hazard_locations:
-                circle = plt.Circle((x_hazard,y_hazard), 0.2, color='blue', alpha=0.5, fill = True)
-                ax.add_patch(circle)
-            
-            for x_vase, y_vase, _ in vase_locations:
-                circle = plt.Circle((x_vase, y_vase), 0.09, color = 'cyan', alpha=0.5, fill = True)
-                ax.add_patch(circle)
-
-            x_goal, y_goal, _ = info.get('goal_position', [0,0,0])
-            circle = plt.Circle((x_goal,y_goal), 0.3, color = 'lightgreen', alpha=0.5, fill = True)
+            goal_pos = self.goal_position
+            circle = plt.Circle((goal_pos[i][0], goal_pos[i][1]), 0.3, color = 'lightgreen', alpha=0.5, fill = True)
             ax.add_patch(circle)
-            
-            x_agent, y_agent, _ = pos
-            theta = self.thetas[i]
-            lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
 
-            hazard_lidar = self.hazard_lidars[i]
-            for hazard_lidar_value, lidar_angle in zip(hazard_lidar, lidar_angle):
-                if hazard_lidar_value == 0:         # Obstacle is not in the lidar range
-                    continue
-                lidar_distance = (1-hazard_lidar_value)*3
-                x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
-                y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
-                circle = plt.Circle((x_lid,y_lid), 2*0.2, color='blue', alpha=0.5, fill = False)
-                ax.add_patch(circle)
-                plt.plot([x_agent, x_lid], [y_agent, y_lid], color='blue', linewidth=0.5, alpha=0.5)
+            if self.level != '0':
+                info = self.locals.get('infos', [{}])[-1]
+                hazard_locations = info.get('hazard_positions', [[]])
+                vase_locations = info.get('vase_positions', [[]])
+
+                for x_hazard ,y_hazard, _ in hazard_locations:
+                    circle = plt.Circle((x_hazard,y_hazard), 0.2, color='blue', alpha=0.5, fill = True)
+                    ax.add_patch(circle)
+                
+                for x_vase, y_vase, _ in vase_locations:
+                    circle = plt.Circle((x_vase, y_vase), 0.09, color = 'cyan', alpha=0.5, fill = True)
+                    ax.add_patch(circle)
+
             
-            vase_lidar = self.vase_lidars[i]
-            lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
-            for vase_lidar_value, lidar_angle in zip(vase_lidar, lidar_angle):
-                if vase_lidar_value == 0:           # Obstacle is not in the lidar range
-                    continue
-                lidar_distance = (1-vase_lidar_value)*3
-                x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
-                y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
-                circle = plt.Circle((x_lid,y_lid), 2*0.09, color='cyan', alpha=0.5, fill = False)
-                ax.add_patch(circle)
-                plt.plot([x_agent, x_lid], [y_agent, y_lid], color='cyan', linewidth=0.5, alpha=0.5)
-            
+                x_agent, y_agent, _ = pos
+                theta = self.thetas[i]
+                lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
+
+                hazard_lidar = self.hazard_lidars[i]
+                for hazard_lidar_value, lidar_angle in zip(hazard_lidar, lidar_angle):
+                    if hazard_lidar_value == 0:         # Obstacle is not in the lidar range
+                        continue
+                    lidar_distance = (1-hazard_lidar_value)*3
+                    x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
+                    y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
+                    circle = plt.Circle((x_lid,y_lid), 2*0.2, color='blue', alpha=0.5, fill = False)
+                    ax.add_patch(circle)
+                    plt.plot([x_agent, x_lid], [y_agent, y_lid], color='blue', linewidth=0.5, alpha=0.5)
+                
+                vase_lidar = self.vase_lidars[i]
+                lidar_angle = np.linspace(0, 2*np.pi, 16, endpoint=False)
+                for vase_lidar_value, lidar_angle in zip(vase_lidar, lidar_angle):
+                    if vase_lidar_value == 0:           # Obstacle is not in the lidar range
+                        continue
+                    lidar_distance = (1-vase_lidar_value)*3
+                    x_lid = x_agent + lidar_distance*np.cos(theta + lidar_angle)
+                    y_lid = y_agent + lidar_distance*np.sin(theta + lidar_angle)
+                    circle = plt.Circle((x_lid,y_lid), 2*0.09, color='cyan', alpha=0.5, fill = False)
+                    ax.add_patch(circle)
+                    plt.plot([x_agent, x_lid], [y_agent, y_lid], color='cyan', linewidth=0.5, alpha=0.5)
+                
 
             plt.plot([p[0] for p in self.positions[:i+1]], [p[1] for p in self.positions[:i+1]], 'ko-', linewidth=0.5, markersize=0.5)
 
@@ -284,8 +291,10 @@ class CustomCallback(BaseCallback):
         self.thetas = []
         
         if self.task == 'Goal':
-            self.hazard_lidars = []
-            self.vase_lidars = []
+            self.goal_position = []
+            if self.level != '0':
+                self.hazard_lidars = []
+                self.vase_lidars = []
 
     def _on_rollout_end(self) -> None:
         """Log episodic metrics to Wandb at the end of a rollout."""

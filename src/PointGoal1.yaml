@@ -2,14 +2,14 @@ base:
   wandb_enabled: True
 main:
   update: False
-  update_from: "artifacts/2024/08/02/Run_1/SAC_200"
+  update_from: "artifacts/2024/08/09/Run_1/SAC_1000"
   env_id: 'SafetyPointGoal1-v0'
   render_mode: None
   model_name: 'SAC'
     
 train:
-  total_num_steps: 250000
-  max_steps_per_episode: 250
+  total_num_steps: 500000
+  max_steps_per_episode: 500
   save_every: 200
   record_every: 100
 

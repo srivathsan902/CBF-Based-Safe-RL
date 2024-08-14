@@ -26,6 +26,9 @@ def extract_task(env_id):
         return 'Circle'
     if 'Goal' in env_id:
         return 'Goal'
+
+def extract_level(env_id):
+    return env_id.split('-')[0][-1]
     
 def main(dir_name, params):
 
@@ -45,11 +48,20 @@ def main(dir_name, params):
     
     # Depending on type of env: Circle or Goal, choose CBF to pass
     task = extract_task(env_id)
+    level = extract_level(env_id)
     params['task'] = task
+    params['level'] = level
     if task == 'Goal':
-        env = CustomEnv(env, params, CBF_Lidar_Based.CBF)
+        if level != '0':
+            env = CustomEnv(env, params, CBF_Lidar_Based.CBF)
+        else:
+            env = CustomEnv(env, params)
+
     elif task == 'Circle':
-        env = CustomEnv(env, params, CBF.CBF)
+        if level != '0':
+            env = CustomEnv(env, params, CBF.CBF)
+        else:
+            env = CustomEnv(env, params)
 
     wandb_enabled = params['base']['wandb_enabled']
 
@@ -138,7 +150,7 @@ def main(dir_name, params):
         model = SAC("MlpPolicy", env, verbose=0, buffer_size=100000)
         callback = CustomCallback(params, dir_name)
 
-    total_timesteps = params['train']['total_num_steps']
+    total_timesteps = params['train']['total_num_steps'] + 5*params['train']['max_steps_per_episode']
 
     model.learn(total_timesteps=total_timesteps, callback=[callback], progress_bar=True, log_interval=1e9)
     

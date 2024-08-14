@@ -19,6 +19,7 @@ with open(os.path.join('src', params_file_name), 'r') as f:
     params = yaml.safe_load(f)
 
 params['task'] = 'Goal'
+params['level'] = '1'
 env_id = params['main'].get('env_id', 'SafetyPointGoal1-v0')
 render_mode = params['main'].get('render_mode', None)
 model_name = params['main']['model_name']
@@ -43,7 +44,7 @@ for episode in range(10):
         x, y, _ = env.task.agent.pos
         goal_pos = env.task.goal.pos
         hazard_pos = env.task.hazards.pos
-        print(len(hazard_pos), hazard_pos[0])
+        # print(len(hazard_pos), hazard_pos[0])
         theta = np.arctan2(next_state[9], next_state[10])*180/np.pi
         theta = (theta + 180) % 360
         theta = theta*np.pi/180
@@ -90,6 +91,8 @@ for episode in range(10):
             # print(next_state)
             plt.show()
         # time.sleep(2)
+        if x**2 + y**2 > 6:
+            truncated = True
         if done or truncated:
             obs = env.reset()
 env.close()
