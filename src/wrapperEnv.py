@@ -13,7 +13,7 @@ class CustomEnv(gymnasium.Wrapper):
         super().__init__(env)
         self.env = env
         self.params = params
-        self.max_steps = params['train'].get('max_steps_per_episode', 250)
+        self.max_steps = params['train'].get('max_steps_per_episode', 500)
         self.action_low = self.env.action_space.low
         self.action_high = self.env.action_space.high
         self.state = self.env.reset()[0]
@@ -60,6 +60,8 @@ class CustomEnv(gymnasium.Wrapper):
         self.num_steps += 1
 
         if self.num_steps >= self.max_steps:
+            done = True
+            info['dones'] = True
             truncated = True
             self.num_steps = 0
 

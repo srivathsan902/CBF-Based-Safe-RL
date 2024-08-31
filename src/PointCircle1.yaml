@@ -2,7 +2,7 @@ base:
   wandb_enabled: True
 main:
   update: False
-  update_from: "artifacts/2024/08/02/Run_1/SAC_200"
+  update_from: "artifacts/2024/08/28/Run_1/SAC_5"
   env_id: 'SafetyPointCircle1-v0'
   render_mode: None
   model_name: 'SAC'
@@ -10,8 +10,9 @@ main:
 train:
   total_num_steps: 500000
   max_steps_per_episode: 500
-  save_every: 200
-  record_every: 100
+  sliding_window: 1000
+  save_every: 100000
+  record_every: 100000
 
 testing:
   models_dir: 'artifacts/2024/08/06/Run_1'

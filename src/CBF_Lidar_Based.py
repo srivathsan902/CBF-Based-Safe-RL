@@ -81,28 +81,25 @@ def CBF(state, pos, action, low, high, debug = False):
         rel_x_obs = x_obs - x
         rel_y_obs = y_obs - y
         if 1 - 4*hazard_radius**2/lidar_distance**2 < 0:
-            cone_angle = np.pi/2
+            cone_angle = np.pi/4
         else:
             cone_angle = np.arccos(1-4*hazard_radius**2/lidar_distance**2)
         dot_product = v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1])
         if dot_product > 0:
             h_velocity = v_val*sp.cos(cone_angle)*(rel_x_obs) + v_val*sp.sin(cone_angle)*(rel_y_obs) - v*sp.cos(theta)*(rel_x_obs) - v*sp.sin(theta)*(rel_y_obs)
-            # h_velocity = v*((sp.cos(theta)-sp.cos(cone_angle))*(rel_x_obs) + (sp.sin(theta)-sp.cos(cone_angle))*(rel_y_obs))
         else:
             h_velocity = 0.01
-
-        # if v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) < 0:
-        #     h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs + d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs + d_thresh_vel * sp.sin(theta_val)))
-        # elif v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) > 0:
-        #     h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs - d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs - d_thresh_vel * sp.sin(theta_val)))
-        # else:
-        #     h_velocity = 0.01
 
         grad_h_position = sp.Matrix([sp.diff(h_position, var) for var in (x, y, v, theta)])
         grad_h_velocity = sp.Matrix([sp.diff(h_velocity, var) for var in (x, y, v, theta)])
 
         position_constraint = grad_h_position.dot(X_dot) + k1 * h_position
-        velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
+
+        sign_h_velocity = sp.sign(h_velocity)
+        if sign_h_velocity == -1:
+            velocity_constraint = grad_h_velocity.dot(X_dot) - k2 * h_velocity
+        else:
+            velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
 
         cbf_constraints.append(position_constraint)
         cbf_constraints.append(velocity_constraint)
@@ -128,21 +125,19 @@ def CBF(state, pos, action, low, high, debug = False):
         dot_product = v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1])
         if dot_product > 0:
             h_velocity = v_val*sp.cos(cone_angle)*(rel_x_obs) + v_val*sp.sin(cone_angle)*(rel_y_obs) - v*sp.cos(theta)*(rel_x_obs) - v*sp.sin(theta)*(rel_y_obs)
-            # h_velocity = v*((sp.cos(theta)-sp.cos(cone_angle))*(rel_x_obs) + (sp.sin(theta)-sp.cos(cone_angle))*(rel_y_obs))
         else:
             h_velocity = 0.01
-        # if v_val * np.cos(theta_val) * (x_obs - pos[0]) + v_val * np.sin(theta_val) * (y_obs - pos[1]) < 0:
-        #     h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs + d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs + d_thresh_vel * sp.sin(theta_val)))
-        # elif v_val * sp.cos(theta_val) * (x_obs - pos[0]) + v_val * sp.sin(theta_val) * (y_obs - pos[1]) > 0:
-        #     h_velocity = 0.01 - (v * sp.cos(theta) * (rel_x_obs - d_thresh_vel * sp.cos(theta_val)) + v * sp.sin(theta) * (rel_y_obs - d_thresh_vel * sp.sin(theta_val)))
-        # else:
-        #     h_velocity = 0.01
+        
 
         grad_h_position = sp.Matrix([sp.diff(h_position, var) for var in (x, y, v, theta)])
         grad_h_velocity = sp.Matrix([sp.diff(h_velocity, var) for var in (x, y, v, theta)])
 
         position_constraint = grad_h_position.dot(X_dot) + k1 * h_position
-        velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
+        sign_h_velocity = sp.sign(h_velocity)
+        if sign_h_velocity == -1:
+            velocity_constraint = grad_h_velocity.dot(X_dot) - k2 * h_velocity
+        else:
+            velocity_constraint = grad_h_velocity.dot(X_dot) + k2 * h_velocity
 
         cbf_constraints.append(position_constraint)
         cbf_constraints.append(velocity_constraint)

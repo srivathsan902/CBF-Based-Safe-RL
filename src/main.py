@@ -60,6 +60,7 @@ def main(dir_name, params):
     elif task == 'Circle':
         if level != '0':
             env = CustomEnv(env, params, CBF.CBF)
+            # env = CustomEnv(env, params)
         else:
             env = CustomEnv(env, params)
 
@@ -91,14 +92,17 @@ def main(dir_name, params):
         if wandb_enabled:
             run_name = params['main']['update_from'].replace('/','-').replace('\\','-').replace('artifacts-', "")
             start_episode_num = int(run_name.split('-')[-1].split('_')[-1])
+            print(f"Starting from episode {start_episode_num}")
             run_name = '-'.join(run_name.split('-')[:-1]) + '-' +  str(start_episode_num)
             artifact_name = model_name + '_' + str(start_episode_num)
+            print('Artifact_name:', artifact_name, 'Run_name:', run_name)
             artifacts = wandb.use_artifact(f'{artifact_name}:{run_name}', type="model")
             artifacts_dir = artifacts.download(root = dir_name)
-            model = SAC.load(os.path.join(dir_name, artifact_name+'.zip'), env)
+            print(f"Downloaded model from {artifact_name}")
+            model = SAC.load(os.path.join(dir_name, artifact_name), env)
 
 
-            data_artifacts = ['episode_rewards', 'episode_costs', 'episode_percent_safe_actions', 'episode_safety_calls']
+            data_artifacts = ['rewards', 'costs', 'percent_safe_actions', 'safety_calls']
             download_name = run_name.split('-')[:-1]
             download_name = '-'.join(download_name)
 
@@ -106,10 +110,10 @@ def main(dir_name, params):
                 artifacts = wandb.use_artifact(f'{artifact}:{download_name}', type="data")
                 artifacts_dir = artifacts.download(root = dir_name)
             
-            all_rewards = np.load(os.path.join(dir_name, 'episode_rewards.npy')).tolist()
-            all_costs = np.load(os.path.join(dir_name, 'episode_costs.npy')).tolist()
-            all_corrective_actions = np.load(os.path.join(dir_name, 'episode_safety_calls.npy')).tolist()
-            all_safe_actions = np.load(os.path.join(dir_name, 'episode_percent_safe_actions.npy')).tolist()
+            all_rewards = np.load(os.path.join(dir_name, 'rewards.npy')).tolist()
+            all_costs = np.load(os.path.join(dir_name, 'costs.npy')).tolist()
+            all_corrective_actions = np.load(os.path.join(dir_name, 'safety_calls.npy')).tolist()
+            all_safe_actions = np.load(os.path.join(dir_name, 'percent_safe_actions.npy')).tolist()
                 
         else:
             model = SAC.load(params['main']['update_from']+'.zip', env)
@@ -118,22 +122,23 @@ def main(dir_name, params):
             start_episode_num = int(run_name.split('-')[-1])
             model.save(os.path.join(dir_name, model_name + f'_{start_episode_num}.zip'))
 
-            if not os.path.exists(os.path.join(update_dir, 'episode_rewards.npy')):
-                all_rewards = np.load(os.path.join(update_dir, 'episode_rewards.npy')).tolist()
+            start_step = start_episode_num*params['train']['max_steps_per_episode']
+            if not os.path.exists(os.path.join(update_dir, 'rewards.npy')):
+                all_rewards = np.load(os.path.join(update_dir, 'rewards.npy')).tolist()
             else:
-                all_rewards = [0]*start_episode_num
-            if not os.path.exists(os.path.join(update_dir, 'episode_costs.npy')):
-                all_costs = np.load(os.path.join(update_dir, 'episode_costs.npy')).tolist()
+                all_rewards = [0]*start_step
+            if not os.path.exists(os.path.join(update_dir, 'costs.npy')):
+                all_costs = np.load(os.path.join(update_dir, 'costs.npy')).tolist()
             else:
-                all_costs = [0]*start_episode_num
-            if not os.path.exists(os.path.join(update_dir, 'episode_safety_calls.npy')):
-                all_corrective_actions = np.load(os.path.join(update_dir, 'episode_safety_calls.npy')).tolist()
+                all_costs = [0]*start_step
+            if not os.path.exists(os.path.join(update_dir, 'safety_calls.npy')):
+                all_corrective_actions = np.load(os.path.join(update_dir, 'safety_calls.npy')).tolist()
             else:
-                all_corrective_actions = [0]*start_episode_num
-            if not os.path.exists(os.path.join(update_dir, 'episode_percent_safe_actions.npy')):
-                all_safe_actions = np.load(os.path.join(update_dir, 'episode_percent_safe_actions.npy')).tolist()
+                all_corrective_actions = [0]*start_step
+            if not os.path.exists(os.path.join(update_dir, 'percent_safe_actions.npy')):
+                all_safe_actions = np.load(os.path.join(update_dir, 'percent_safe_actions.npy')).tolist()
             else:
-                all_safe_actions = [100]*start_episode_num
+                all_safe_actions = [100]*start_step
             
         data = { 
                 'rewards': all_rewards,
@@ -143,7 +148,7 @@ def main(dir_name, params):
             }
         
         callback = CustomCallback(params, dir_name)
-        callback.load_previous_run(data, start_episode_num)
+        callback.load_previous_run(data, start_episode_num*params['train']['max_steps_per_episode'])
 
 
     else:
